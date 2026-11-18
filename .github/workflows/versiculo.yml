@@ -1,0 +1,36 @@
+name: Versiculo del dia
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Traer el versiculo
+        run: |
+          python3 - <<'EOF'
+          import re, json, html, urllib.request
+          req = urllib.request.Request(
+              "https://www.churchofjesuschrist.org/my-home?lang=spa",
+              headers={"User-Agent": "Mozilla/5.0"})
+          page = urllib.request.urlopen(req).read().decode("utf-8")
+          m = re.search(r'Vers[ií]culo del d[ií]a</h3><div[^>]*>([^<]+)</div><a[^>]*>([^<]+)</a>', page)
+          if not m:
+              raise SystemExit("No encontré el versículo")
+          data = {"versiculo": html.unescape(m[1]).strip(),
+                  "referencia": html.unescape(m[2]).strip()}
+          json.dump(data, open("versiculo.json", "w", encoding="utf-8"), ensure_ascii=False)
+          EOF
+      - name: Guardar cambios
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add versiculo.json
+          git commit -m "Actualizar versiculo" || exit 0
+          git push
